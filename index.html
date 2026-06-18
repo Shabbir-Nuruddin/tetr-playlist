@@ -29,7 +29,12 @@
   .stat-label{font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;}
 
   /* CONNECTION STATUS */
-  .conn{max-width:1100px;margin:0 auto;padding:.75rem 2rem 0;}
+  .conn{max-width:1100px;margin:0 auto;padding:.75rem 2rem 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .admin-btn{margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:inherit;padding:6px 14px;border-radius:999px;cursor:pointer;transition:.15s;}
+  .admin-btn:hover{border-color:var(--green);color:var(--green);}
+  .admin-btn.is-admin{border-color:#2a4a33;color:var(--green);}
+  .edit-btn{background:none;border:none;color:#555;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:4px;transition:.15s;}
+  .edit-btn:hover{color:var(--green);background:#15251a;}
   .conn-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:#1a1a1a;color:var(--muted);}
   .conn-dot{width:8px;height:8px;border-radius:50%;background:#888;flex-shrink:0;}
   .conn.ok .conn-dot{background:var(--green);box-shadow:0 0 6px var(--green);}
@@ -123,10 +128,11 @@
 <!-- CONNECTION STATUS -->
 <div class="conn" id="conn">
   <span class="conn-pill"><span class="conn-dot"></span><span id="connText">Connecting to the shared playlist…</span></span>
+  <button id="adminBtn" class="admin-btn" onclick="adminAction()">Admin sign in</button>
 </div>
 
-<!-- ADD ENTRY -->
-<div class="add-section">
+<!-- ADD ENTRY (admin only) -->
+<div class="add-section" id="addSection" style="display:none;">
   <button class="add-toggle" id="addToggle" onclick="toggleForm()">
     <div class="add-toggle-icon">+</div>
     <span class="add-toggle-text">Add a new entry</span>
@@ -210,12 +216,15 @@
    ============================================================ */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, addDoc, deleteDoc, doc,
+  getFirestore, collection, addDoc, deleteDoc, updateDoc, doc,
   onSnapshot, query, orderBy, serverTimestamp, getDocs, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
-  getAuth, signInAnonymously, onAuthStateChanged
+  getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// Only this Google account may add / edit / delete. Everyone else is read-only.
+const ADMIN_EMAIL = "nuruddinshabbir3@gmail.com";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAOLI5UO87dMswbrCEEz6fzkhSJsMERLt0",
@@ -292,11 +301,12 @@ const SEED=[
 ];
 
 /* ---------- state ---------- */
-let data=[];                 // live list from Firestore: [{id, name, song, artist, genre, owner}]
+let data=[];                 // live list from Firestore: [{id, name, song, artist, genre}]
 let currentFilter='all';
 let sortCol=null,sortAsc=true;
 let seedTried=false;
-let myUid=null;              // this browser's anonymous identity
+let isAdmin=false;           // true only when signed in as ADMIN_EMAIL
+let editId=null;             // id of the entry currently being edited (admin)
 
 /* ---------- helpers ---------- */
 function nameColor(name){
@@ -350,13 +360,16 @@ function render(){
       <td><div class="song-title">${esc(r.song)}</div></td>
       <td><div class="artist-text">${esc(r.artist)}</div></td>
       <td><span class="badge" style="background:${gc.bg};color:${gc.text}">${esc(r.genre)}</span></td>
-      <td>${(myUid && r.owner===myUid) ? `<button class="del-btn" title="Remove your entry" data-id="${esc(r.id)}">×</button>` : ''}</td>
+      <td style="white-space:nowrap;">${isAdmin ? `<button class="edit-btn" title="Edit" data-edit="${esc(r.id)}">✎</button><button class="del-btn" title="Remove" data-id="${esc(r.id)}">×</button>` : ''}</td>
     `;
     tbody.appendChild(tr);
   });
-  // wire delete buttons (ids are Firestore strings, so we attach listeners here)
+  // wire admin buttons (ids are Firestore strings, so we attach listeners here)
   tbody.querySelectorAll('.del-btn').forEach(b=>{
     b.addEventListener('click',()=>deleteEntry(b.dataset.id));
+  });
+  tbody.querySelectorAll('.edit-btn').forEach(b=>{
+    b.addEventListener('click',()=>editEntry(b.dataset.edit));
   });
 }
 
@@ -375,42 +388,68 @@ function sortBy(th){
   th.querySelector('.sa').textContent=sortAsc?'↑':'↓';
   render();
 }
+function resetForm(){
+  editId=null;
+  document.getElementById('inp-name').value='';
+  document.getElementById('inp-song').value='';
+  document.getElementById('inp-artist').value='';
+  document.getElementById('inp-genre').value='Pop';
+  document.getElementById('addBtn').textContent='Add ↵';
+}
+
 function toggleForm(){
   const f=document.getElementById('addForm');
   const open=f.classList.toggle('open');
   document.querySelector('.add-toggle-sub').textContent=open?'Click to collapse':'Click to expand';
-  if(open) document.getElementById('inp-name').focus();
+  if(open){ resetForm(); document.getElementById('inp-name').focus(); }
 }
 
-/* ---------- writes to Firestore ---------- */
+// Load an existing entry into the form so the admin can edit it.
+function editEntry(id){
+  if(!isAdmin) return;
+  const r=data.find(x=>x.id===id);
+  if(!r) return;
+  editId=id;
+  document.getElementById('inp-name').value=r.name;
+  document.getElementById('inp-song').value=r.song;
+  document.getElementById('inp-artist').value=r.artist;
+  document.getElementById('inp-genre').value=r.genre;
+  document.getElementById('addBtn').textContent='Save ↵';
+  const f=document.getElementById('addForm');
+  if(!f.classList.contains('open')){ f.classList.add('open'); document.querySelector('.add-toggle-sub').textContent='Click to collapse'; }
+  document.getElementById('inp-name').focus();
+}
+
+/* ---------- writes to Firestore (admin only) ---------- */
 async function addEntry(){
+  if(!isAdmin){showToast('Only the admin can change the list ✦',true);return;}
   const name=document.getElementById('inp-name').value.trim();
   const song=document.getElementById('inp-song').value.trim();
   const artist=document.getElementById('inp-artist').value.trim();
   const genre=document.getElementById('inp-genre').value;
   if(!name||!song){showToast('Please fill in at least Name and Song ✦',true);return;}
-  if(!myUid){showToast('Still connecting — try again in a moment',true);return;}
   const btn=document.getElementById('addBtn');
   btn.disabled=true;
   try{
-    await addDoc(entriesCol,{
-      name,song,artist:artist||'Unknown',genre,owner:myUid,created:serverTimestamp()
-    });
-    document.getElementById('inp-name').value='';
-    document.getElementById('inp-song').value='';
-    document.getElementById('inp-artist').value='';
-    document.getElementById('inp-genre').value='Pop';
-    showToast(`Added "${song}" by ${artist||'Unknown'} ✓`);
+    if(editId){
+      await updateDoc(doc(db,'entries',editId),{name,song,artist:artist||'Unknown',genre});
+      showToast(`Updated "${song}" ✓`);
+    }else{
+      await addDoc(entriesCol,{name,song,artist:artist||'Unknown',genre,created:serverTimestamp()});
+      showToast(`Added "${song}" by ${artist||'Unknown'} ✓`);
+    }
+    resetForm();
     // The list updates automatically for everyone via the live listener.
   }catch(e){
     console.error(e);
-    showToast('Could not save — check your connection',true);
+    showToast('Could not save — are you signed in as admin?',true);
   }finally{
     btn.disabled=false;
   }
 }
 
 async function deleteEntry(id){
+  if(!isAdmin) return;
   try{
     await deleteDoc(doc(db,'entries',id));
     showToast('Entry removed');
@@ -437,7 +476,7 @@ async function maybeSeed(){
     const batch=writeBatch(db);
     SEED.forEach((r,i)=>{
       const ref=doc(entriesCol);
-      batch.set(ref,{...r,owner:myUid,created:serverTimestamp(),_seedOrder:i});
+      batch.set(ref,{...r,created:serverTimestamp(),_seedOrder:i});
     });
     await batch.commit();
   }catch(e){ console.error('seed failed',e); }
@@ -448,10 +487,10 @@ function start(){
   const q=query(entriesCol,orderBy('created','asc'));
   onSnapshot(q,
     snap=>{
-      data=snap.docs.map(d=>{const v=d.data();return {id:d.id,name:v.name||'',song:v.song||'',artist:v.artist||'',genre:v.genre||'Other',owner:v.owner||null};});
-      setConn('ok','Live — shared with everyone');
+      data=snap.docs.map(d=>{const v=d.data();return {id:d.id,name:v.name||'',song:v.song||'',artist:v.artist||'',genre:v.genre||'Other'};});
+      setConn('ok','Live playlist');
       render();
-      if(data.length===0) maybeSeed();   // first ever visit seeds the starter songs
+      if(data.length===0 && isAdmin) maybeSeed();   // re-seed only if admin opens an empty list
     },
     err=>{
       console.error(err);
@@ -460,29 +499,47 @@ function start(){
   );
 }
 
+/* ---------- admin sign in / out (Google) ---------- */
+function applyAdminUI(){
+  const btn=document.getElementById('adminBtn');
+  document.getElementById('addSection').style.display=isAdmin?'block':'none';
+  btn.textContent=isAdmin?'Sign out (admin)':'Admin sign in';
+  btn.classList.toggle('is-admin',isAdmin);
+  if(!isAdmin){ const f=document.getElementById('addForm'); f.classList.remove('open'); resetForm(); }
+}
+
+async function adminAction(){
+  try{
+    if(isAdmin){ await signOut(auth); return; }
+    await signInWithPopup(auth,new GoogleAuthProvider());
+  }catch(e){
+    console.error(e);
+    showToast('Sign-in failed',true);
+  }
+}
+
 /* ---------- expose handlers used by inline onclick="" ---------- */
 window.toggleForm=toggleForm;
 window.addEntry=addEntry;
 window.setFilter=setFilter;
 window.sortBy=sortBy;
 window.render=render;
+window.adminAction=adminAction;
 
 /* ---------- boot ---------- */
 ['inp-name','inp-song','inp-artist'].forEach(id=>{
   document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addEntry();});
 });
 render();
+applyAdminUI();
 
-// Sign in silently (anonymous), then connect the live listener.
+// Reading the list needs no sign-in. Signing in is only for the admin.
 onAuthStateChanged(auth,user=>{
-  if(user){ myUid=user.uid; render(); }   // re-render so my own delete buttons appear
+  isAdmin = !!(user && user.email && user.email.toLowerCase()===ADMIN_EMAIL.toLowerCase());
+  applyAdminUI();
+  render();
 });
-signInAnonymously(auth)
-  .then(start)
-  .catch(err=>{
-    console.error(err);
-    setConn('err','Sign-in failed — enable Anonymous auth in Firebase');
-  });
+start();
 </script>
 </body>
 </html>
