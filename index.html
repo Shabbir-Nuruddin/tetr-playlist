@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TETR Batch Playlist</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green:#1DB954;--black:#121212;--dark:#181818;--card:#242424;
+    --muted:#b3b3b3;--white:#ffffff;--text:#e0e0e0;--border:#2e2e2e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--black);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+
+  /* HERO */
+  .hero{background:linear-gradient(180deg,#1a3a25 0%,#121212 100%);padding:2.5rem 2rem 2rem;text-align:center;position:relative;overflow:hidden;}
+  .hero::before{content:'';position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:320px;height:320px;background:radial-gradient(circle,rgba(29,185,84,.18) 0%,transparent 70%);pointer-events:none;}
+  .hero-eyebrow{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--green);font-weight:600;margin-bottom:.6rem;}
+  .hero-title{font-family:'Playfair Display',serif;font-size:clamp(1.8rem,5vw,2.8rem);color:var(--white);line-height:1.1;margin-bottom:.4rem;}
+  .hero-sub{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
+  .hero-link{display:inline-flex;align-items:center;gap:8px;background:var(--green);color:var(--black);font-weight:700;font-size:13px;padding:11px 22px;border-radius:999px;text-decoration:none;transition:.15s;}
+  .hero-link:hover{background:#1ed760;transform:scale(1.03);}
+
+  /* STATS */
+  .stats{display:flex;justify-content:center;gap:1px;background:var(--border);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+  .stat{flex:1;max-width:200px;background:var(--dark);padding:1.1rem 1rem;text-align:center;}
+  .stat-num{font-size:1.9rem;font-weight:700;color:var(--green);line-height:1;}
+  .stat-label{font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;}
+
+  /* CONNECTION STATUS */
+  .conn{max-width:1100px;margin:0 auto;padding:.75rem 2rem 0;}
+  .conn-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:#1a1a1a;color:var(--muted);}
+  .conn-dot{width:8px;height:8px;border-radius:50%;background:#888;flex-shrink:0;}
+  .conn.ok .conn-dot{background:var(--green);box-shadow:0 0 6px var(--green);}
+  .conn.ok .conn-pill{color:var(--green);border-color:#2a4a33;}
+  .conn.err .conn-dot{background:#e05555;}
+  .conn.err .conn-pill{color:#e08080;border-color:#4a2a2a;}
+
+  /* ADD ENTRY PANEL */
+  .add-section{max-width:1100px;margin:0 auto;padding:1.5rem 2rem 0;}
+  .add-toggle{display:flex;align-items:center;gap:10px;background:#1a2a1f;border:1px solid #2a4a33;border-radius:10px;padding:12px 16px;cursor:pointer;transition:.15s;width:100%;}
+  .add-toggle:hover{background:#1f3326;border-color:var(--green);}
+  .add-toggle-icon{width:28px;height:28px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;color:var(--black);font-weight:700;line-height:1;}
+  .add-toggle-text{font-size:14px;font-weight:600;color:var(--green);}
+  .add-toggle-sub{font-size:12px;color:var(--muted);margin-left:auto;}
+
+  .add-form{display:none;margin-top:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+  .add-form.open{display:flex;}
+  .form-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:160px;}
+  .form-group label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+  .form-group input, .form-group select{background:#1e1e1e;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;padding:9px 12px;outline:none;font-family:inherit;transition:.15s;width:100%;}
+  .form-group input:focus,.form-group select:focus{border-color:var(--green);}
+  .form-group select option{background:#1e1e1e;}
+  .add-btn{background:var(--green);color:var(--black);font-weight:700;font-size:14px;padding:10px 24px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:.15s;}
+  .add-btn:hover{background:#1ed760;transform:scale(1.02);}
+  .add-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .cancel-btn{background:transparent;color:var(--muted);font-size:13px;padding:10px 12px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:.15s;}
+  .cancel-btn:hover{color:var(--text);border-color:#555;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--green);color:var(--black);font-weight:700;font-size:13px;padding:10px 20px;border-radius:999px;opacity:0;transition:all .3s;z-index:999;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.bad{background:#e05555;color:#fff;}
+
+  /* CONTROLS */
+  .controls{padding:1.25rem 2rem .5rem;display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-width:1100px;margin:0 auto;}
+  .search-wrap{position:relative;flex:1;min-width:200px;}
+  .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+  input[type=text]{width:100%;background:#2a2a2a;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;padding:9px 12px 9px 34px;outline:none;font-family:inherit;transition:.15s;}
+  input[type=text]:focus{border-color:var(--green);}
+  input[type=text]::placeholder{color:#666;}
+  .filter-btns{display:flex;gap:6px;flex-wrap:wrap;}
+  .filter-btn{background:#2a2a2a;border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:inherit;padding:7px 13px;border-radius:999px;cursor:pointer;transition:.15s;font-weight:500;}
+  .filter-btn:hover{border-color:var(--green);color:var(--green);}
+  .filter-btn.active{background:var(--green);border-color:var(--green);color:var(--black);font-weight:700;}
+
+  /* TABLE */
+  .table-wrap{max-width:1100px;margin:0 auto;padding:.5rem 2rem 3rem;overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  thead th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;}
+  thead th:hover{color:var(--white);}
+  thead th .sa{margin-left:4px;opacity:.4;}
+  thead th.sorted .sa{opacity:1;color:var(--green);}
+  tbody tr{border-bottom:1px solid #1f1f1f;transition:background .1s;}
+  tbody tr:hover{background:#1e1e1e;}
+  tbody td{padding:12px 14px;vertical-align:middle;}
+  .rn{color:#555;font-size:13px;width:36px;}
+  .avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;text-transform:uppercase;}
+  .name-cell{display:flex;align-items:center;gap:10px;}
+  .name-text{font-weight:500;color:var(--white);}
+  .song-title{color:var(--white);font-weight:500;}
+  .artist-text{color:var(--muted);font-size:13px;margin-top:2px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;}
+  .del-btn{background:none;border:none;color:#444;cursor:pointer;font-size:16px;padding:4px 8px;border-radius:4px;transition:.15s;}
+  .del-btn:hover{color:#e05555;background:#2a1515;}
+  .empty-msg{text-align:center;padding:3rem;color:var(--muted);font-size:14px;}
+
+  @media(max-width:600px){
+    .hero{padding:1.75rem 1rem 1.5rem;}
+    .add-section,.controls,.table-wrap,.conn{padding-left:1rem;padding-right:1rem;}
+    .add-form{padding:1rem;}
+    .stat-num{font-size:1.5rem;}
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <p class="hero-eyebrow">TETR College of Business · Batch Evangelist</p>
+  <h1 class="hero-title">Our Batch Playlist 🎵</h1>
+  <p class="hero-sub">Every song, every person — all in one place.</p>
+  <a class="hero-link" href="https://bit.ly/tetrplaylist" target="_blank">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+    Open on Spotify
+  </a>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-num" id="countPeople">0</div><div class="stat-label">Batchmates</div></div>
+  <div class="stat"><div class="stat-num" id="countSongs">0</div><div class="stat-label">Songs</div></div>
+  <div class="stat"><div class="stat-num" id="countShowing">0</div><div class="stat-label">Showing</div></div>
+</div>
+
+<!-- CONNECTION STATUS -->
+<div class="conn" id="conn">
+  <span class="conn-pill"><span class="conn-dot"></span><span id="connText">Connecting to the shared playlist…</span></span>
+</div>
+
+<!-- ADD ENTRY -->
+<div class="add-section">
+  <button class="add-toggle" id="addToggle" onclick="toggleForm()">
+    <div class="add-toggle-icon">+</div>
+    <span class="add-toggle-text">Add a new entry</span>
+    <span class="add-toggle-sub">Click to expand</span>
+  </button>
+  <div class="add-form" id="addForm">
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" id="inp-name" placeholder="e.g. Priya Sharma" />
+    </div>
+    <div class="form-group">
+      <label>Song</label>
+      <input type="text" id="inp-song" placeholder="e.g. Blinding Lights" />
+    </div>
+    <div class="form-group">
+      <label>Artist</label>
+      <input type="text" id="inp-artist" placeholder="e.g. The Weeknd" />
+    </div>
+    <div class="form-group" style="min-width:140px;max-width:175px;">
+      <label>Vibe</label>
+      <select id="inp-genre">
+        <option value="Pop">Pop</option>
+        <option value="Bollywood">Bollywood</option>
+        <option value="Indie">Indie</option>
+        <option value="Classic">Classic</option>
+        <option value="R&B/Hip-Hop">R&B / Hip-Hop</option>
+        <option value="Electronic">Electronic</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <button class="add-btn" id="addBtn" onclick="addEntry()">Add ↵</button>
+    <button class="cancel-btn" onclick="toggleForm()">Cancel</button>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="search-wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="searchInput" placeholder="Search by name, song, or artist…" oninput="render()">
+  </div>
+  <div class="filter-btns">
+    <button class="filter-btn active" data-genre="all" onclick="setFilter(this)">All vibes</button>
+    <button class="filter-btn" data-genre="Bollywood" onclick="setFilter(this)">Bollywood</button>
+    <button class="filter-btn" data-genre="Pop" onclick="setFilter(this)">Pop</button>
+    <button class="filter-btn" data-genre="Indie" onclick="setFilter(this)">Indie</button>
+    <button class="filter-btn" data-genre="Classic" onclick="setFilter(this)">Classic</button>
+    <button class="filter-btn" data-genre="R&B/Hip-Hop" onclick="setFilter(this)">R&B / Hip-Hop</button>
+    <button class="filter-btn" data-genre="Electronic" onclick="setFilter(this)">Electronic</button>
+    <button class="filter-btn" data-genre="Other" onclick="setFilter(this)">Other</button>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="rn">#</th>
+        <th data-col="name" onclick="sortBy(this)">Name <span class="sa">↕</span></th>
+        <th data-col="song" onclick="sortBy(this)">Song <span class="sa">↕</span></th>
+        <th data-col="artist" onclick="sortBy(this)">Artist <span class="sa">↕</span></th>
+        <th data-col="genre">Vibe</th>
+        <th style="width:40px;"></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <p class="empty-msg" id="emptyMsg" style="display:none;">No matches found.</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* ============================================================
+   FIREBASE  —  shared online storage for the playlist.
+   Everyone who opens this page reads & writes the SAME list.
+
+   👉 PASTE YOUR FIREBASE CONFIG BELOW (replace the placeholder).
+      You get this from the Firebase console:
+      Project settings → "Your apps" → Web app → SDK setup → Config.
+   ============================================================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, deleteDoc, doc,
+  onSnapshot, query, orderBy, serverTimestamp, getDocs, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY_HERE",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId: "PASTE_YOUR_PROJECT_ID",
+  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_SENDER_ID",
+  appId: "PASTE_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const entriesCol = collection(db, "entries");
+
+/* ---------- visual palettes (unchanged) ---------- */
+const PALETTE=[
+  {bg:'#1a3a25',text:'#52d981'},{bg:'#3a1a2a',text:'#d981b3'},
+  {bg:'#1a2a3a',text:'#81b3d9'},{bg:'#3a2a1a',text:'#d9b381'},
+  {bg:'#2a1a3a',text:'#b381d9'},{bg:'#1a3a3a',text:'#81d9d9'},
+  {bg:'#3a3a1a',text:'#d9d981'},{bg:'#3a1a1a',text:'#d98181'},
+  {bg:'#1a1a3a',text:'#8181d9'},{bg:'#2a3a1a',text:'#b3d981'},
+  {bg:'#3a2a2a',text:'#d9a081'},{bg:'#1a2a2a',text:'#81c9b3'},
+  {bg:'#2a2a3a',text:'#a0a0e0'},{bg:'#3a1a2a',text:'#e0a0c8'},
+  {bg:'#1a3a2a',text:'#80d4a0'},{bg:'#2a3a3a',text:'#80c8d4'},
+  {bg:'#3a3a2a',text:'#d4c880'},{bg:'#2a1a2a',text:'#c880d4'},
+];
+const GENRE_COLORS={
+  'Bollywood':{bg:'#3a1e00',text:'#f5a623'},
+  'Pop':{bg:'#1a0030',text:'#c97aff'},
+  'Indie':{bg:'#002a1a',text:'#4ecba4'},
+  'Classic':{bg:'#001a3a',text:'#6aaee8'},
+  'R&B/Hip-Hop':{bg:'#300010',text:'#f07090'},
+  'Electronic':{bg:'#00202a',text:'#40c8e0'},
+  'Other':{bg:'#2a2a2a',text:'#b3b3b3'},
+};
+
+/* ---------- starter songs (used once, only if the DB is empty) ---------- */
+const SEED=[
+  {name:'Bhavyaa',song:'Bounce',artist:'Shubh',genre:'R&B/Hip-Hop'},
+  {name:'Julia',song:'I Can Do It with a Broken Heart',artist:'Taylor Swift',genre:'Pop'},
+  {name:'Julia',song:"There's Nothing Holdin' Me Back",artist:'Shawn Mendes',genre:'Pop'},
+  {name:'Dashaan',song:'Aankhon Se Batana',artist:'Dikshant',genre:'Bollywood'},
+  {name:'Milan',song:'Pannonia',artist:'DESH, Young Fly, Azahriah',genre:'Indie'},
+  {name:'Sahasra',song:'Yellow',artist:'Coldplay',genre:'Pop'},
+  {name:'Rishi',song:'Iris',artist:'Goo Goo Dolls',genre:'Classic'},
+  {name:'Akash',song:'Prince of Egypt',artist:'Mofe.',genre:'Classic'},
+  {name:'Ghiserna',song:'Safe and Sound',artist:'Capital Cities',genre:'Indie'},
+  {name:'Soham',song:'Feel It (From "Invincible")',artist:'d4vd',genre:'Indie'},
+  {name:'Umesh',song:'Skyfall',artist:'Adele',genre:'Classic'},
+  {name:'Roshan',song:'September',artist:'Earth, Wind & Fire',genre:'Classic'},
+  {name:'Roshan',song:'Another Day in Paradise - 2016 Remaster',artist:'Phil Collins',genre:'Classic'},
+  {name:'Darshil',song:'Let It Happen',artist:'Tame Impala',genre:'Indie'},
+  {name:'Sumanth',song:"Don't Stop 'Til You Get Enough",artist:'Michael Jackson',genre:'Classic'},
+  {name:'Shambhavi',song:'Pal Pal Dil Ke Paas - Title Track',artist:'Arijit Singh, Parampara Thakur, Sachet-Parampara',genre:'Bollywood'},
+  {name:'Shambhavi',song:'On the Floor',artist:'Jennifer Lopez, Pitbull',genre:'Electronic'},
+  {name:'Ayana Shah',song:'End of Beginning',artist:'Djo',genre:'Indie'},
+  {name:'Leandro Silva',song:'Now or Never - Ultra Slowed',artist:'Tkandz, CXSPER',genre:'R&B/Hip-Hop'},
+  {name:'Rudra',song:'9',artist:'Drake',genre:'R&B/Hip-Hop'},
+  {name:'Arav Jain',song:'I Want It That Way',artist:'Backstreet Boys',genre:'Classic'},
+  {name:'Sahar',song:'Heal the World',artist:'Michael Jackson',genre:'Classic'},
+  {name:'Nina',song:'I Follow Rivers',artist:'Lykke Li',genre:'Indie'},
+  {name:'Vibha',song:'Cosmic Tea',artist:'Riley Wells',genre:'Indie'},
+  {name:'Sanskruti',song:'Best I Ever Had',artist:'Drake',genre:'R&B/Hip-Hop'},
+  {name:'Nupur',song:'Darkhaast',artist:'Mithoon, Arijit Singh, Sunidhi Chauhan, Sayeed Quadri',genre:'Bollywood'},
+  {name:'Nupur',song:'Jamaican (Bam Bam)',artist:'HUGEL, SOLTO (FR)',genre:'Electronic'},
+  {name:'Priyansh',song:'Signs',artist:'Drake',genre:'R&B/Hip-Hop'},
+  {name:'Priyansh',song:'Kho Gaye',artist:'Taaruk Raina, Mismatched: Season 2 (Cast)',genre:'Bollywood'},
+  {name:'Amy',song:'Kings & Queens',artist:'Ava Max',genre:'Pop'},
+  {name:'Ernesto',song:'Cuando Calienta El Sol',artist:'Luis Miguel',genre:'Classic'},
+  {name:'Kovidh',song:'Thinking of You',artist:'AP Dhillon',genre:'R&B/Hip-Hop'},
+];
+
+/* ---------- state ---------- */
+let data=[];                 // live list from Firestore: [{id, name, song, artist, genre}]
+let currentFilter='all';
+let sortCol=null,sortAsc=true;
+let seedTried=false;
+
+/* ---------- helpers ---------- */
+function nameColor(name){
+  let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))&0xffff;
+  return PALETTE[h%PALETTE.length];
+}
+function initials(name){return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
+function uniquePeople(arr){return new Set(arr.map(r=>r.name)).size;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function setConn(state,msg){
+  const c=document.getElementById('conn');
+  c.className='conn'+(state?(' '+state):'');
+  document.getElementById('connText').textContent=msg;
+}
+
+/* ---------- render ---------- */
+function render(){
+  let rows=[...data];
+  const q=document.getElementById('searchInput').value.toLowerCase().trim();
+  if(q) rows=rows.filter(r=>r.name.toLowerCase().includes(q)||r.song.toLowerCase().includes(q)||r.artist.toLowerCase().includes(q));
+  if(currentFilter!=='all') rows=rows.filter(r=>r.genre===currentFilter);
+  if(sortCol){
+    rows.sort((a,b)=>{
+      const va=(a[sortCol]||'').toLowerCase(),vb=(b[sortCol]||'').toLowerCase();
+      return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    });
+  }
+  document.getElementById('countPeople').textContent=uniquePeople(data);
+  document.getElementById('countSongs').textContent=data.length;
+  document.getElementById('countShowing').textContent=rows.length;
+  const tbody=document.getElementById('tableBody');
+  tbody.innerHTML='';
+  document.getElementById('emptyMsg').style.display=rows.length?'none':'block';
+  rows.forEach((r,i)=>{
+    const pal=nameColor(r.name);
+    const gc=GENRE_COLORS[r.genre]||GENRE_COLORS['Other'];
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="rn">${i+1}</td>
+      <td><div class="name-cell">
+        <div class="avatar" style="background:${pal.bg};color:${pal.text}">${initials(r.name)}</div>
+        <span class="name-text">${esc(r.name)}</span>
+      </div></td>
+      <td><div class="song-title">${esc(r.song)}</div></td>
+      <td><div class="artist-text">${esc(r.artist)}</div></td>
+      <td><span class="badge" style="background:${gc.bg};color:${gc.text}">${esc(r.genre)}</span></td>
+      <td><button class="del-btn" title="Remove" data-id="${esc(r.id)}">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  // wire delete buttons (ids are Firestore strings, so we attach listeners here)
+  tbody.querySelectorAll('.del-btn').forEach(b=>{
+    b.addEventListener('click',()=>deleteEntry(b.dataset.id));
+  });
+}
+
+/* ---------- filters / sorting / form (UI only) ---------- */
+function setFilter(btn){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter=btn.dataset.genre;
+  render();
+}
+function sortBy(th){
+  const col=th.dataset.col;
+  if(sortCol===col) sortAsc=!sortAsc; else{sortCol=col;sortAsc=true;}
+  document.querySelectorAll('thead th').forEach(t=>{t.classList.remove('sorted');const s=t.querySelector('.sa');if(s)s.textContent='↕';});
+  th.classList.add('sorted');
+  th.querySelector('.sa').textContent=sortAsc?'↑':'↓';
+  render();
+}
+function toggleForm(){
+  const f=document.getElementById('addForm');
+  const open=f.classList.toggle('open');
+  document.querySelector('.add-toggle-sub').textContent=open?'Click to collapse':'Click to expand';
+  if(open) document.getElementById('inp-name').focus();
+}
+
+/* ---------- writes to Firestore ---------- */
+async function addEntry(){
+  const name=document.getElementById('inp-name').value.trim();
+  const song=document.getElementById('inp-song').value.trim();
+  const artist=document.getElementById('inp-artist').value.trim();
+  const genre=document.getElementById('inp-genre').value;
+  if(!name||!song){showToast('Please fill in at least Name and Song ✦',true);return;}
+  const btn=document.getElementById('addBtn');
+  btn.disabled=true;
+  try{
+    await addDoc(entriesCol,{
+      name,song,artist:artist||'Unknown',genre,created:serverTimestamp()
+    });
+    document.getElementById('inp-name').value='';
+    document.getElementById('inp-song').value='';
+    document.getElementById('inp-artist').value='';
+    document.getElementById('inp-genre').value='Pop';
+    showToast(`Added "${song}" by ${artist||'Unknown'} ✓`);
+    // The list updates automatically for everyone via the live listener.
+  }catch(e){
+    console.error(e);
+    showToast('Could not save — check your connection',true);
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+async function deleteEntry(id){
+  try{
+    await deleteDoc(doc(db,'entries',id));
+    showToast('Entry removed');
+  }catch(e){
+    console.error(e);
+    showToast('Could not remove entry',true);
+  }
+}
+
+function showToast(msg,bad){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(bad?' bad':'');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+/* ---------- one-time seed (only if the collection is empty) ---------- */
+async function maybeSeed(){
+  if(seedTried) return;
+  seedTried=true;
+  try{
+    const snap=await getDocs(entriesCol);
+    if(!snap.empty) return;            // already has data — do nothing
+    const batch=writeBatch(db);
+    SEED.forEach((r,i)=>{
+      const ref=doc(entriesCol);
+      batch.set(ref,{...r,created:serverTimestamp(),_seedOrder:i});
+    });
+    await batch.commit();
+  }catch(e){ console.error('seed failed',e); }
+}
+
+/* ---------- live connection: updates the page in real time ---------- */
+function start(){
+  const q=query(entriesCol,orderBy('created','asc'));
+  onSnapshot(q,
+    snap=>{
+      data=snap.docs.map(d=>{const v=d.data();return {id:d.id,name:v.name||'',song:v.song||'',artist:v.artist||'',genre:v.genre||'Other'};});
+      setConn('ok','Live — shared with everyone');
+      render();
+      if(data.length===0) maybeSeed();   // first ever visit seeds the starter songs
+    },
+    err=>{
+      console.error(err);
+      setConn('err','Not connected — check Firebase config / rules');
+    }
+  );
+}
+
+/* ---------- expose handlers used by inline onclick="" ---------- */
+window.toggleForm=toggleForm;
+window.addEntry=addEntry;
+window.setFilter=setFilter;
+window.sortBy=sortBy;
+window.render=render;
+
+/* ---------- boot ---------- */
+['inp-name','inp-song','inp-artist'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addEntry();});
+});
+render();
+start();
+</script>
+</body>
+</html>
