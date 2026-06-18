@@ -265,7 +265,7 @@ const SEED=[
   {name:'Sahasra',song:'Yellow',artist:'Coldplay',genre:'Pop'},
   {name:'Rishi',song:'Iris',artist:'Goo Goo Dolls',genre:'Classic'},
   {name:'Akash',song:'Prince of Egypt',artist:'Mofe.',genre:'Classic'},
-  {name:'Ghiserna',song:'Safe and Sound',artist:'Capital Cities',genre:'Indie'},
+  {name:'Giaserena',song:'Safe and Sound',artist:'Capital Cities',genre:'Indie'},
   {name:'Soham',song:'Feel It (From "Invincible")',artist:'d4vd',genre:'Indie'},
   {name:'Umesh',song:'Skyfall',artist:'Adele',genre:'Classic'},
   {name:'Roshan',song:'September',artist:'Earth, Wind & Fire',genre:'Classic'},
@@ -275,6 +275,7 @@ const SEED=[
   {name:'Shambhavi',song:'Pal Pal Dil Ke Paas - Title Track',artist:'Arijit Singh, Parampara Thakur, Sachet-Parampara',genre:'Bollywood'},
   {name:'Shambhavi',song:'On the Floor',artist:'Jennifer Lopez, Pitbull',genre:'Electronic'},
   {name:'Ayana Shah',song:'End of Beginning',artist:'Djo',genre:'Indie'},
+  {name:'Ayana Shah',song:'Dooron Dooron',artist:'Paresh Pahuja, Shiv Tandan, Meghdeep Bose',genre:'Bollywood'},
   {name:'Leandro Silva',song:'Now or Never - Ultra Slowed',artist:'Tkandz, CXSPER',genre:'R&B/Hip-Hop'},
   {name:'Rudra',song:'9',artist:'Drake',genre:'R&B/Hip-Hop'},
   {name:'Arav Jain',song:'I Want It That Way',artist:'Backstreet Boys',genre:'Classic'},
@@ -289,6 +290,7 @@ const SEED=[
   {name:'Amy',song:'Kings & Queens',artist:'Ava Max',genre:'Pop'},
   {name:'Ernesto',song:'Cuando Calienta El Sol',artist:'Luis Miguel',genre:'Classic'},
   {name:'Kovidh',song:'Thinking of You',artist:'AP Dhillon',genre:'R&B/Hip-Hop'},
+  {name:'Kovidh',song:'Khat',artist:'Navjot Ahuja',genre:'Bollywood'},
 ];
 
 /* ---------- state ---------- */
@@ -324,6 +326,12 @@ function render(){
       const va=(a[sortCol]||'').toLowerCase(),vb=(b[sortCol]||'').toLowerCase();
       return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
     });
+  } else {
+    // Default view: keep each person's songs grouped together,
+    // in the order their name first appeared.
+    const firstSeen=new Map();
+    rows.forEach(r=>{ if(!firstSeen.has(r.name)) firstSeen.set(r.name,firstSeen.size); });
+    rows.sort((a,b)=>firstSeen.get(a.name)-firstSeen.get(b.name));
   }
   document.getElementById('countPeople').textContent=uniquePeople(data);
   document.getElementById('countSongs').textContent=data.length;
