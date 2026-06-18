@@ -213,18 +213,24 @@ import {
   getFirestore, collection, addDoc, deleteDoc, doc,
   onSnapshot, query, orderBy, serverTimestamp, getDocs, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, signInAnonymously, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "PASTE_YOUR_API_KEY_HERE",
-  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId: "PASTE_YOUR_PROJECT_ID",
-  storageBucket: "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyAOLI5UO87dMswbrCEEz6fzkhSJsMERLt0",
+  authDomain: "tetr-playlist.firebaseapp.com",
+  projectId: "tetr-playlist",
+  storageBucket: "tetr-playlist.firebasestorage.app",
+  messagingSenderId: "987180080571",
+  appId: "1:987180080571:web:5632cd407703eff538f89e"
 };
+
+const MAX_PER_PERSON = 2;   // each visitor may add at most this many songs
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 const entriesCol = collection(db, "entries");
 
 /* ---------- visual palettes (unchanged) ---------- */
@@ -286,10 +292,11 @@ const SEED=[
 ];
 
 /* ---------- state ---------- */
-let data=[];                 // live list from Firestore: [{id, name, song, artist, genre}]
+let data=[];                 // live list from Firestore: [{id, name, song, artist, genre, owner}]
 let currentFilter='all';
 let sortCol=null,sortAsc=true;
 let seedTried=false;
+let myUid=null;              // this browser's anonymous identity
 
 /* ---------- helpers ---------- */
 function nameColor(name){
@@ -337,7 +344,7 @@ function render(){
       <td><div class="song-title">${esc(r.song)}</div></td>
       <td><div class="artist-text">${esc(r.artist)}</div></td>
       <td><span class="badge" style="background:${gc.bg};color:${gc.text}">${esc(r.genre)}</span></td>
-      <td><button class="del-btn" title="Remove" data-id="${esc(r.id)}">×</button></td>
+      <td>${(myUid && r.owner===myUid) ? `<button class="del-btn" title="Remove your entry" data-id="${esc(r.id)}">×</button>` : ''}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -376,11 +383,14 @@ async function addEntry(){
   const artist=document.getElementById('inp-artist').value.trim();
   const genre=document.getElementById('inp-genre').value;
   if(!name||!song){showToast('Please fill in at least Name and Song ✦',true);return;}
+  if(!myUid){showToast('Still connecting — try again in a moment',true);return;}
+  const mine=data.filter(r=>r.owner===myUid).length;
+  if(mine>=MAX_PER_PERSON){showToast(`You can only add ${MAX_PER_PERSON} songs ✦`,true);return;}
   const btn=document.getElementById('addBtn');
   btn.disabled=true;
   try{
     await addDoc(entriesCol,{
-      name,song,artist:artist||'Unknown',genre,created:serverTimestamp()
+      name,song,artist:artist||'Unknown',genre,owner:myUid,created:serverTimestamp()
     });
     document.getElementById('inp-name').value='';
     document.getElementById('inp-song').value='';
@@ -423,7 +433,7 @@ async function maybeSeed(){
     const batch=writeBatch(db);
     SEED.forEach((r,i)=>{
       const ref=doc(entriesCol);
-      batch.set(ref,{...r,created:serverTimestamp(),_seedOrder:i});
+      batch.set(ref,{...r,owner:myUid,created:serverTimestamp(),_seedOrder:i});
     });
     await batch.commit();
   }catch(e){ console.error('seed failed',e); }
@@ -434,7 +444,7 @@ function start(){
   const q=query(entriesCol,orderBy('created','asc'));
   onSnapshot(q,
     snap=>{
-      data=snap.docs.map(d=>{const v=d.data();return {id:d.id,name:v.name||'',song:v.song||'',artist:v.artist||'',genre:v.genre||'Other'};});
+      data=snap.docs.map(d=>{const v=d.data();return {id:d.id,name:v.name||'',song:v.song||'',artist:v.artist||'',genre:v.genre||'Other',owner:v.owner||null};});
       setConn('ok','Live — shared with everyone');
       render();
       if(data.length===0) maybeSeed();   // first ever visit seeds the starter songs
@@ -458,7 +468,17 @@ window.render=render;
   document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')addEntry();});
 });
 render();
-start();
+
+// Sign in silently (anonymous), then connect the live listener.
+onAuthStateChanged(auth,user=>{
+  if(user){ myUid=user.uid; render(); }   // re-render so my own delete buttons appear
+});
+signInAnonymously(auth)
+  .then(start)
+  .catch(err=>{
+    console.error(err);
+    setConn('err','Sign-in failed — enable Anonymous auth in Firebase');
+  });
 </script>
 </body>
 </html>
