@@ -226,8 +226,6 @@ const firebaseConfig = {
   appId: "1:987180080571:web:5632cd407703eff538f89e"
 };
 
-const MAX_PER_PERSON = 2;   // each visitor may add at most this many songs
-
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -392,8 +390,6 @@ async function addEntry(){
   const genre=document.getElementById('inp-genre').value;
   if(!name||!song){showToast('Please fill in at least Name and Song ✦',true);return;}
   if(!myUid){showToast('Still connecting — try again in a moment',true);return;}
-  const mine=data.filter(r=>r.owner===myUid).length;
-  if(mine>=MAX_PER_PERSON){showToast(`You can only add ${MAX_PER_PERSON} songs ✦`,true);return;}
   const btn=document.getElementById('addBtn');
   btn.disabled=true;
   try{
